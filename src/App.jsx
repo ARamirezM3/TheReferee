@@ -45,15 +45,82 @@ function getTestColor(v) {
   return "#22c55e";
 }
 
+/* PUNTO 1: solo círculos azules en el calendario */
 function getCalDayStyle(value, isToday) {
-  if (isToday) return { background: "#7c3aed", color: "white", borderRadius: "50%" };
-  if (value === undefined) return {};
-  const opacity = +(0.2 + value * 0.8).toFixed(2);
-  const base = value > 0.5 ? "239,68,68" : value > 0.25 ? "202,138,4" : "34,197,94";
-  return { background: `rgba(${base},${opacity})`, borderRadius: "50%", color: "#1e1b4b" };
+  if (value === undefined) {
+    if (isToday) return { borderRadius: "50%", border: "2px solid #2563eb", boxSizing: "border-box" };
+    return {};
+  }
+  let opacity;
+  if (value < 0.25) opacity = 0.15;
+  else if (value < 0.50) opacity = 0.45;
+  else if (value < 0.75) opacity = 0.75;
+  else opacity = 1.0;
+
+  const style = {
+    background: `rgba(37,99,235,${opacity})`,
+    borderRadius: "50%",
+    color: opacity >= 0.75 ? "white" : "#1e1b4b",
+  };
+  if (isToday) style.border = "2px solid #2563eb";
+  return style;
 }
 
-/* ---- Panel: Notificaciones ---- */
+/* ---- Shared helpers ---- */
+function Toggle({ on, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      style={{
+        width: 44, height: 24, borderRadius: 12,
+        background: on ? "#7c3aed" : "#d1d5db",
+        border: "none", cursor: "pointer", position: "relative",
+        transition: "background 0.2s", flexShrink: 0,
+      }}
+    >
+      <span style={{
+        position: "absolute", top: 2, left: on ? 22 : 2,
+        width: 20, height: 20, borderRadius: "50%",
+        background: "white", transition: "left 0.2s",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.2)", display: "block",
+      }} />
+    </button>
+  );
+}
+
+function ToggleRow({ label, on, onChange, last }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: last ? "none" : "1px solid var(--border)" }}>
+      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", paddingRight: 12 }}>{label}</span>
+      <Toggle on={on} onChange={onChange} />
+    </div>
+  );
+}
+
+function PasswordField({ label, value, onChange }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</label>
+      <div style={{ position: "relative" }}>
+        <input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ width: "100%", padding: "12px 44px 12px 12px", border: "2px solid var(--border)", borderRadius: 10, fontSize: 14, fontFamily: "Nunito,sans-serif", color: "var(--text)", outline: "none", background: "white" }}
+        />
+        <button
+          onClick={() => setShow(s => !s)}
+          style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}
+        >
+          {show ? "🙈" : "👁️"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Panel: Notificaciones (HomeScreen mailbox) ---- */
 function NotificacionesPanel({ onClose }) {
   const [requests, setRequests] = useState([
     { id: 1, name: "Ana García", initials: "AG", color: "#e91e8c" },
@@ -135,6 +202,52 @@ function HistorialPanel({ onClose }) {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Panel: Amigos ---- */
+function AmigosPanel({ onClose }) {
+  const [search, setSearch] = useState("");
+  const FRIENDS = [
+    { name: "Lucas Martínez", initials: "LM", color: "#3498db" },
+    { name: "Elena García", initials: "EG", color: "#e91e8c" },
+    { name: "Pablo Rodríguez", initials: "PR", color: "#e67e22" },
+    { name: "Sara López", initials: "SL", color: "#9b59b6" },
+    { name: "Tomás Fernández", initials: "TF", color: "#2ecc71" },
+    { name: "Marta Sánchez", initials: "MS", color: "#e74c3c" },
+  ];
+  const filtered = FRIENDS.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="slide-panel">
+      <header className="panel-header">
+        <button className="panel-back" onClick={onClose}>←</button>
+        <h2 className="panel-title">Amigos</h2>
+        <span />
+      </header>
+      <div className="panel-body">
+        <input
+          type="text"
+          placeholder="Buscar amigos..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: "100%", padding: "10px 14px", border: "2px solid var(--border)", borderRadius: 10, fontSize: 14, fontFamily: "Nunito,sans-serif", color: "var(--text)", marginBottom: 16, outline: "none", background: "white" }}
+        />
+        {filtered.length === 0 ? (
+          <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 14, padding: "24px 0" }}>Aún no tienes amigos añadidos</p>
+        ) : (
+          <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+            {filtered.map((f, i) => (
+              <div key={f.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}>
+                <div style={{ width: 42, height: 42, borderRadius: "50%", background: f.color, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{f.initials}</div>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{f.name}</span>
+                <span style={{ color: "var(--text-muted)", fontSize: 20 }}>›</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -287,9 +400,83 @@ function BoquillasPanel({ onClose }) {
   );
 }
 
+/* ---- Config sub-panels ---- */
+function CambioContrasenaPanel({ onClose }) {
+  const [curr, setCurr] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  return (
+    <div className="slide-panel" style={{ zIndex: 53 }}>
+      <header className="panel-header">
+        <button className="panel-back" onClick={onClose}>←</button>
+        <h2 className="panel-title">Cambiar contraseña</h2>
+        <span />
+      </header>
+      <div className="panel-body">
+        <PasswordField label="Contraseña actual" value={curr} onChange={setCurr} />
+        <PasswordField label="Nueva contraseña" value={newPass} onChange={setNewPass} />
+        <PasswordField label="Confirmar nueva contraseña" value={confirm} onChange={setConfirm} />
+        <button style={{ width: "100%", background: "#7c3aed", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 16, fontWeight: 800, fontFamily: "Nunito,sans-serif", cursor: "pointer", marginTop: 8 }}>
+          Aceptar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VisibilidadPerfilPanel({ onClose }) {
+  const [vis, setVis] = useState({ sugerencias: true, fotos: true, noAmigos: false });
+  function toggle(key) { setVis(p => ({ ...p, [key]: !p[key] })); }
+  const items = [
+    { key: "sugerencias", label: "Aparecer en sugerencias de amigos de amigos" },
+    { key: "fotos", label: "Mostrar fotos a miembros de mis grupos" },
+    { key: "noAmigos", label: "Foto de perfil visible para no amigos" },
+  ];
+  return (
+    <div className="slide-panel" style={{ zIndex: 53 }}>
+      <header className="panel-header">
+        <button className="panel-back" onClick={onClose}>←</button>
+        <h2 className="panel-title">Visibilidad del perfil</h2>
+        <span />
+      </header>
+      <div className="panel-body">
+        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+          {items.map((item, i) => (
+            <ToggleRow key={item.key} label={item.label} on={vis[item.key]} onChange={() => toggle(item.key)} last={i === items.length - 1} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BluetoothPanel({ onClose }) {
+  return (
+    <div className="slide-panel" style={{ zIndex: 53 }}>
+      <header className="panel-header">
+        <button className="panel-back" onClick={onClose}>←</button>
+        <h2 className="panel-title">Bluetooth</h2>
+        <span />
+      </header>
+      <div className="panel-body" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320 }}>
+        <svg viewBox="0 0 24 24" width="80" height="80" className="bt-icon-anim">
+          <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z" />
+        </svg>
+        <p style={{ marginTop: 20, fontSize: 16, fontWeight: 700, color: "var(--text)", textAlign: "center" }}>Sincronizando dispositivo...</p>
+        <p style={{ marginTop: 8, fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.5 }}>Asegúrate de que el alcoholímetro<br />está encendido y cerca</p>
+      </div>
+    </div>
+  );
+}
+
 /* ---- Panel: Configuración ---- */
 function ConfiguracionPanel({ onClose }) {
-  const ITEMS = ["Accesibilidad","Seguridad y privacidad","Visibilidad del perfil","Notificaciones","Bluetooth"];
+  const [subPanel, setSubPanel] = useState(null);
+  const ITEMS = [
+    { label: "Cambio de contraseña", panel: "contrasena" },
+    { label: "Visibilidad del perfil", panel: "visibilidad" },
+    { label: "Bluetooth", panel: "bluetooth" },
+  ];
   return (
     <div className="slide-panel">
       <header className="panel-header">
@@ -300,8 +487,8 @@ function ConfiguracionPanel({ onClose }) {
       <div className="panel-body">
         <div className="profile-menu" style={{ margin: 0 }}>
           {ITEMS.map(item => (
-            <button key={item} className="menu-item">
-              <span>{item}</span>
+            <button key={item.label} className="menu-item" onClick={() => setSubPanel(item.panel)}>
+              <span>{item.label}</span>
               <span className="menu-arrow">›</span>
             </button>
           ))}
@@ -313,6 +500,10 @@ function ConfiguracionPanel({ onClose }) {
           </button>
         </div>
       </div>
+
+      {subPanel === "contrasena" && <CambioContrasenaPanel onClose={() => setSubPanel(null)} />}
+      {subPanel === "visibilidad" && <VisibilidadPerfilPanel onClose={() => setSubPanel(null)} />}
+      {subPanel === "bluetooth" && <BluetoothPanel onClose={() => setSubPanel(null)} />}
     </div>
   );
 }
@@ -323,6 +514,7 @@ export default function App() {
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
+  const [fontSize, setFontSize] = useState("normal");
 
   function handleTabChange(tab) {
     setActiveTab(tab);
@@ -342,6 +534,7 @@ export default function App() {
     }
     const MAP = {
       "Historial": "historial",
+      "Amigos": "amigos",
       "Calendario": "calendario",
       "Alcoholímetro": "alcoholimetro",
       "Boquillas": "boquillas",
@@ -350,9 +543,11 @@ export default function App() {
     if (MAP[item]) openPanel(MAP[item]);
   }
 
+  const fontClass = fontSize !== "normal" ? ` font-${fontSize}` : "";
+
   return (
     <div className="app-shell">
-      <div className={`phone-frame${darkMode ? " dark-mode" : ""}`}>
+      <div className={`phone-frame${darkMode ? " dark-mode" : ""}${fontClass}`}>
         <div className="screen-content">
           {activeTab === "home" && (
             <HomeScreen
@@ -361,7 +556,15 @@ export default function App() {
             />
           )}
           {activeTab === "group" && <GroupScreen onHamburger={() => setSideMenuOpen(true)} />}
-          {activeTab === "profile" && <ProfileScreen onHamburger={() => setSideMenuOpen(true)} />}
+          {activeTab === "profile" && (
+            <ProfileScreen
+              onHamburger={() => setSideMenuOpen(true)}
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+              fontSize={fontSize}
+              setFontSize={setFontSize}
+            />
+          )}
         </div>
         <BottomNav activeTab={activeTab} setActiveTab={handleTabChange} />
 
@@ -384,6 +587,7 @@ export default function App() {
 
         {activePanel === "notificaciones" && <NotificacionesPanel onClose={() => setActivePanel(null)} />}
         {activePanel === "historial" && <HistorialPanel onClose={() => setActivePanel(null)} />}
+        {activePanel === "amigos" && <AmigosPanel onClose={() => setActivePanel(null)} />}
         {activePanel === "calendario" && <CalendarioPanel onClose={() => setActivePanel(null)} />}
         {activePanel === "alcoholimetro" && <AlcohimetroPanel onClose={() => setActivePanel(null)} />}
         {activePanel === "boquillas" && <BoquillasPanel onClose={() => setActivePanel(null)} />}

@@ -1330,3 +1330,26 @@ body {
   font-weight: 800;
   color: white;
 }
+
+/* ---- Font size classes (Preferencias) ---- */
+:root { --base-font-size: 14px; }
+.phone-frame.font-small  { --base-font-size: 12px; font-size: 12px; }
+.phone-frame.font-large  { --base-font-size: 16px; font-size: 16px; }
+.phone-frame.font-xlarge { --base-font-size: 18px; font-size: 18px; }
+
+.phone-frame .menu-item,
+.phone-frame .stat-row,
+.phone-frame .notif-text,
+.phone-frame .notif-name,
+.phone-frame .side-nav-item {
+  font-size: var(--base-font-size, 14px);
+}
+
+/* ---- Bluetooth animation ---- */
+@keyframes btColorPulse {
+  0%, 100% { fill: #2563eb; }
+  50%       { fill: #9ca3af; }
+}
+.bt-icon-anim {
+  animation: btColorPulse 1.5s ease-in-out infinite;
+}

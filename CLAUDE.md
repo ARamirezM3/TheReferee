@@ -43,15 +43,22 @@ public/images/
   - Sub-tabs copa (28px) / grupo (iniciales "GR") con indicador deslizante animado
   - Tab copa: ranking de participantes con barras de color, "Cargar test" actualiza a Carlos (horas en formato 24h)
   - Tab fotos: placeholder vacío
-- ProfileScreen:
-  - Avatar SVG + secciones de menú (Cambiar nombre, Preferencias, Notificaciones, Valora la app, Términos legales)
-  - Eliminadas "Accesibilidad" y "Seguridad y privacidad" (movidas a panel Configuración)
 - Paneles del menú lateral (slide desde la derecha):
   - Historial: resumen estadístico + gráfico de barras por hora + lista de últimos 8 tests
-  - Calendario: selector semana/mes/año, días con tests coloreados por valor, día actual en morado
+  - Amigos: barra de búsqueda + lista vertical de 6 amigos con avatar, nombre y flecha ›
+  - Calendario: selector semana/mes/año; círculos azules con opacidad por nivel (0.15/0.45/0.75/1.0); día actual con borde azul fino
   - Alcoholímetro: imagen de producto + botones "Ver especificaciones" y "Comprar · 18,99 €"
   - Boquillas: imagen de producto + precio destacado + botón "Comprar · 3,99 €"
-  - Configuración: lista de ajustes + "Cerrar sesión" en rojo
+  - Configuración: Cambio de contraseña / Visibilidad del perfil / Bluetooth / Cerrar sesión; cada opción abre sub-panel (z-index 53)
+    - Cambio de contraseña: 3 campos password con toggle ojo + botón Aceptar
+    - Visibilidad del perfil: 3 toggles funcionales
+    - Bluetooth: icono SVG animado azul↔gris 1.5s + texto de sincronización
+- ProfileScreen:
+  - Avatar SVG (o imagen elegida por usuario) + secciones de menú
+  - "Cambiar Datos" abre panel con avatar editable (input file), campos nombre/fecha/peso/altura + Guardar
+  - "Preferencias": slider tamaño fuente (4 posiciones), selector idioma Español/English, toggle modo oscuro
+  - "Notificaciones": 7 toggles de preferencias de notificación funcionales
+  - Tamaño de fuente aplica clase font-small/large/xlarge en phone-frame con CSS custom property --base-font-size
 - Sin lógica real de backend ni conexión Arduino todavía
 
 ## Diseño base
