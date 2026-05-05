@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { supabase } from "../supabase";
 
-export default function RegisterScreen({ onGoLogin }) {
+export default function RegisterScreen({ onGoLogin, onRegistered }) {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +31,6 @@ export default function RegisterScreen({ onGoLogin }) {
     setLoading(true);
     setError("");
     try {
-      // 1. Crear usuario en Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -48,7 +47,6 @@ export default function RegisterScreen({ onGoLogin }) {
 
       const uid = data.user.id;
 
-      // 2. Subir foto de perfil si se eligió una
       let fotoURL = "";
       if (photoFile) {
         const ext = photoFile.name.split(".").pop();
@@ -61,7 +59,6 @@ export default function RegisterScreen({ onGoLogin }) {
         }
       }
 
-      // 3. Guardar fila en tabla "usuarios"
       const { error: insertError } = await supabase.from("usuarios").insert({
         id: uid,
         nombre: nombre.trim(),
@@ -74,7 +71,7 @@ export default function RegisterScreen({ onGoLogin }) {
         return;
       }
 
-      // onAuthStateChange en App.jsx detecta el nuevo usuario y muestra la app
+      onRegistered?.(uid);
     } catch (e) {
       setError("Error al crear la cuenta. Inténtalo de nuevo.");
     } finally {
@@ -84,7 +81,6 @@ export default function RegisterScreen({ onGoLogin }) {
 
   return (
     <div className="screen" style={{ padding: "0 24px", gap: 0, overflowY: "auto" }}>
-      {/* Logo / título */}
       <div style={{ textAlign: "center", marginTop: 32, marginBottom: 24 }}>
         <img src="/images/logo.png" alt="TheReferee" style={{ height: 48, objectFit: "contain", marginBottom: 8 }} />
         <div style={{ fontFamily: "'Black Han Sans', sans-serif", fontSize: 28, color: "#7c3aed", letterSpacing: 2 }}>
@@ -92,11 +88,9 @@ export default function RegisterScreen({ onGoLogin }) {
         </div>
       </div>
 
-      {/* Tarjeta del formulario */}
       <div style={{ background: "white", borderRadius: 18, padding: 24, boxShadow: "0 4px 24px rgba(124,58,237,0.12)", border: "1px solid #e5e7eb", marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: "#1e1b4b", marginBottom: 20 }}>Crear cuenta</div>
 
-        {/* Avatar */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
           <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current.click()}>
             <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#ede9fe", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "3px solid #7c3aed" }}>
@@ -122,7 +116,7 @@ export default function RegisterScreen({ onGoLogin }) {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Mínimo 6 caracteres"
-              style={inputStyle}
+              style={{ ...inputStyle, paddingRight: 44 }}
             />
             <button
               onClick={() => setShowPass(s => !s)}
@@ -142,7 +136,6 @@ export default function RegisterScreen({ onGoLogin }) {
         </button>
       </div>
 
-      {/* Ir a login */}
       <div style={{ textAlign: "center", marginBottom: 32, fontSize: 13, color: "#6b7280" }}>
         ¿Ya tienes cuenta?{" "}
         <button onClick={onGoLogin} style={{ background: "none", border: "none", color: "#7c3aed", fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "Nunito, sans-serif" }}>

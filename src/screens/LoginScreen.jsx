@@ -28,7 +28,6 @@ export default function LoginScreen({ onGoRegister }) {
 
   return (
     <div className="screen" style={{ justifyContent: "center", padding: "0 24px", gap: 0 }}>
-      {/* Logo / título */}
       <div style={{ textAlign: "center", marginBottom: 36 }}>
         <img src="/images/logo.png" alt="TheReferee" style={{ height: 56, objectFit: "contain", marginBottom: 10 }} />
         <div style={{ fontFamily: "'Black Han Sans', sans-serif", fontSize: 32, color: "#7c3aed", letterSpacing: 2 }}>
@@ -37,7 +36,6 @@ export default function LoginScreen({ onGoRegister }) {
         <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Alcoholímetro social</div>
       </div>
 
-      {/* Tarjeta del formulario */}
       <div style={{ background: "white", borderRadius: 18, padding: 24, boxShadow: "0 4px 24px rgba(124,58,237,0.12)", border: "1px solid #e5e7eb" }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: "#1e1b4b", marginBottom: 20 }}>Iniciar sesión</div>
 
@@ -51,13 +49,15 @@ export default function LoginScreen({ onGoRegister }) {
               value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleLogin()}
-              placeholder="••••••••"
-              style={inputStyle}
+              placeholder="Contraseña"
+              style={{ ...inputStyle, paddingRight: 44, color: password ? "#1e1b4b" : "#9ca3af" }}
             />
             <button
               onClick={() => setShowPass(s => !s)}
-              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#6b7280" }}
-            >{showPass ? "🙈" : "👁️"}</button>
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "#9ca3af" }}
+            >
+              {showPass ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
           </div>
         </div>
 
@@ -72,7 +72,6 @@ export default function LoginScreen({ onGoRegister }) {
         </button>
       </div>
 
-      {/* Ir a registro */}
       <div style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "#6b7280" }}>
         ¿No tienes cuenta?{" "}
         <button onClick={onGoRegister} style={{ background: "none", border: "none", color: "#7c3aed", fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "Nunito, sans-serif" }}>
@@ -80,6 +79,24 @@ export default function LoginScreen({ onGoRegister }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
   );
 }
 
