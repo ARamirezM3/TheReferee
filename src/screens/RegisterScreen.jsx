@@ -171,6 +171,7 @@ function Field({ label, type, value, onChange, placeholder }) {
 function friendlyError(msg) {
   if (!msg) return "Error al crear la cuenta. Inténtalo de nuevo.";
   const m = msg.toLowerCase();
+  if (m.includes("rate limit") || m.includes("over_email_send_rate_limit") || m.includes("too many")) return "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.";
   if (m.includes("already registered") || m.includes("user already registered")) return "Este email ya tiene una cuenta.";
   if (m.includes("password should be") || m.includes("password is too short")) return "La contraseña debe tener al menos 6 caracteres.";
   if (m.includes("invalid email") || m.includes("unable to validate")) return "El email introducido no es válido.";
