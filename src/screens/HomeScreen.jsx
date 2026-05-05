@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../supabase";
 import {
   LineChart,
   Line,
@@ -21,7 +22,6 @@ const INITIAL_CHART_DATA = [
   { t: "10", gl: 0.05 },
 ];
 
-// Color stops: green → amber (AA contrast with white) → red
 const COLOR_STOPS = [
   { v: 0.00, r: 34,  g: 197, b: 94  },
   { v: 0.20, r: 202, g: 138, b: 4   },
@@ -62,18 +62,52 @@ function getRefereeImage(v) {
   return "/images/thereferee_roja.png";
 }
 
-const PERSONAS = [
-  { name: "Lucas",  initials: "L", color: "#3498db" },
-  { name: "Elena",  initials: "E", color: "#e91e8c" },
-  { name: "Pablo",  initials: "P", color: "#e67e22" },
-  { name: "Sara",   initials: "S", color: "#9b59b6" },
-  { name: "Tomás",  initials: "T", color: "#2ecc71" },
-];
+const USER_COLORS = ["#3498db", "#e91e8c", "#e67e22", "#9b59b6", "#2ecc71"];
 
-export default function HomeScreen({ onHamburger, onOpenNotifications }) {
+function PersonaCard({ persona }) {
+  const [following, setFollowing] = useState(false);
+  const initials = persona.nombre
+    ? persona.nombre.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+    : "?";
+  const bg = USER_COLORS[persona.id.charCodeAt(0) % USER_COLORS.length];
+
+  return (
+    <div className="persona-card">
+      <div
+        className="persona-avatar"
+        style={{ background: bg, overflow: "hidden", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        {persona.foto_perfil
+          ? <img src={persona.foto_perfil} alt={persona.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : initials}
+      </div>
+      <div className="persona-name">{persona.nombre}</div>
+      <button
+        className="persona-follow-btn"
+        onClick={() => setFollowing(f => !f)}
+        style={following ? { background: "#e5e7eb", color: "#374151" } : {}}
+      >
+        {following ? "Siguiendo" : "Seguir"}
+      </button>
+    </div>
+  );
+}
+
+export default function HomeScreen({ onHamburger, onOpenNotifications, currentUser }) {
   const [gl, setGl] = useState(0.05);
   const [testKey, setTestKey] = useState(0);
   const [chartData, setChartData] = useState(INITIAL_CHART_DATA);
+  const [personas, setPersonas] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    supabase
+      .from("usuarios")
+      .select("id, nombre, foto_perfil")
+      .neq("id", currentUser.id)
+      .limit(5)
+      .then(({ data }) => { if (data) setPersonas(data); });
+  }, [currentUser]);
 
   const isPositive = gl >= 0.50;
   const isPulsing = gl > 0.60;
@@ -212,12 +246,13 @@ export default function HomeScreen({ onHamburger, onOpenNotifications }) {
       <div className="personas-section">
         <div className="personas-title">Personas que quizás conozcas</div>
         <div className="personas-scroll">
-          {PERSONAS.map(p => (
-            <div key={p.name} className="persona-card">
-              <div className="persona-avatar" style={{ background: p.color }}>{p.initials}</div>
-              <div className="persona-name">{p.name}</div>
-              <button className="persona-follow-btn">Seguir</button>
-            </div>
+          {personas.length === 0 && (
+            <p style={{ color: "#6b7280", fontSize: 13, padding: "8px 4px", whiteSpace: "nowrap" }}>
+              No hay usuarios disponibles
+            </p>
+          )}
+          {personas.map(p => (
+            <PersonaCard key={p.id} persona={p} />
           ))}
         </div>
       </div>
@@ -233,7 +268,6 @@ function MailboxIcon() {
   );
 }
 
-/* ---- SVG Icons ---- */
 function ShareIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">

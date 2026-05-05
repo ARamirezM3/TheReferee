@@ -599,9 +599,10 @@ export default function App() {
             <HomeScreen
               onHamburger={() => setSideMenuOpen(true)}
               onOpenNotifications={() => openPanel("notificaciones")}
+              currentUser={currentUser}
             />
           )}
-          {activeTab === "group" && <GroupScreen onHamburger={() => setSideMenuOpen(true)} />}
+          {activeTab === "group" && <GroupScreen onHamburger={() => setSideMenuOpen(true)} currentUser={currentUser} />}
           {activeTab === "profile" && (
             <ProfileScreen
               onHamburger={() => setSideMenuOpen(true)}

@@ -6,7 +6,8 @@
       "Bash(npm install *)",
       "Bash(npm uninstall *)",
       "Bash(Remove-Item src\\\\firebase.js)",
-      "Bash(Select-String -Path src\\\\**\\\\*.jsx,src\\\\**\\\\*.js -Pattern \"firebase\" -Recurse)"
+      "Bash(Select-String -Path src\\\\**\\\\*.jsx,src\\\\**\\\\*.js -Pattern \"firebase\" -Recurse)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ]
   }
 }

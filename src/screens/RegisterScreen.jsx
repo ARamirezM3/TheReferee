@@ -36,7 +36,15 @@ export default function RegisterScreen({ onGoLogin }) {
         email: email.trim(),
         password,
       });
-      if (signUpError) { setError(friendlyError(signUpError.message)); return; }
+      if (signUpError) {
+        console.error("Error en signUp:", signUpError);
+        setError(friendlyError(signUpError.message));
+        return;
+      }
+      if (!data.user) {
+        setError("No se pudo crear la cuenta. Inténtalo de nuevo.");
+        return;
+      }
 
       const uid = data.user.id;
 
@@ -54,12 +62,17 @@ export default function RegisterScreen({ onGoLogin }) {
       }
 
       // 3. Guardar fila en tabla "usuarios"
-      await supabase.from("usuarios").insert({
+      const { error: insertError } = await supabase.from("usuarios").insert({
         id: uid,
         nombre: nombre.trim(),
         email: email.trim(),
         foto_perfil: fotoURL,
       });
+      if (insertError) {
+        console.error("Error insertando usuario:", insertError);
+        setError("Error al guardar el perfil: " + insertError.message);
+        return;
+      }
 
       // onAuthStateChange en App.jsx detecta el nuevo usuario y muestra la app
     } catch (e) {
@@ -157,9 +170,11 @@ function Field({ label, type, value, onChange, placeholder }) {
 
 function friendlyError(msg) {
   if (!msg) return "Error al crear la cuenta. Inténtalo de nuevo.";
-  if (msg.includes("already registered")) return "Este email ya está registrado.";
-  if (msg.includes("Password should be")) return "La contraseña debe tener al menos 6 caracteres.";
-  return "Error al crear la cuenta. Inténtalo de nuevo.";
+  const m = msg.toLowerCase();
+  if (m.includes("already registered") || m.includes("user already registered")) return "Este email ya tiene una cuenta.";
+  if (m.includes("password should be") || m.includes("password is too short")) return "La contraseña debe tener al menos 6 caracteres.";
+  if (m.includes("invalid email") || m.includes("unable to validate")) return "El email introducido no es válido.";
+  return `Error al crear la cuenta: ${msg}`;
 }
 
 const labelStyle = {
