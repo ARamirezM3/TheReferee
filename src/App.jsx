@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { supabase } from "./supabase";
 import HomeScreen from "./screens/HomeScreen";
 import GroupScreen from "./screens/GroupScreen";
 import ProfileScreen from "./screens/ProfileScreen";
+import LoginScreen from "./screens/LoginScreen";
+import RegisterScreen from "./screens/RegisterScreen";
 import "./index.css";
 
 const SIDE_MENU_ITEMS = [
@@ -495,7 +498,7 @@ function ConfiguracionPanel({ onClose }) {
         </div>
         <div className="menu-divider" />
         <div className="profile-menu" style={{ margin: 0 }}>
-          <button className="menu-item logout-btn">
+          <button className="menu-item logout-btn" onClick={() => supabase.auth.signOut()}>
             <span>Cerrar sesión</span>
           </button>
         </div>
@@ -515,6 +518,49 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [fontSize, setFontSize] = useState("normal");
+  // undefined = cargando, null = no autenticado, User = autenticado
+  const [currentUser, setCurrentUser] = useState(undefined);
+  const [authView, setAuthView] = useState("login");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Pantalla de carga mientras Supabase resuelve el estado de auth
+  if (currentUser === undefined) {
+    return (
+      <div className="app-shell">
+        <div className="phone-frame" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Black Han Sans', sans-serif", fontSize: 28, color: "#7c3aed", letterSpacing: 2 }}>TheReferee</div>
+            <div style={{ marginTop: 16, color: "#6b7280", fontSize: 14 }}>Cargando...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Pantallas de autenticación
+  if (!currentUser) {
+    return (
+      <div className="app-shell">
+        <div className="phone-frame">
+          <div className="screen-content">
+            {authView === "login"
+              ? <LoginScreen onGoRegister={() => setAuthView("register")} />
+              : <RegisterScreen onGoLogin={() => setAuthView("login")} />
+            }
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   function handleTabChange(tab) {
     setActiveTab(tab);
@@ -563,6 +609,7 @@ export default function App() {
               setDarkMode={setDarkMode}
               fontSize={fontSize}
               setFontSize={setFontSize}
+              currentUser={currentUser}
             />
           )}
         </div>

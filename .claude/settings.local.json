@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(Remove-Item src\\\\firebase.js)",
+      "Bash(Select-String -Path src\\\\**\\\\*.jsx,src\\\\**\\\\*.js -Pattern \"firebase\" -Recurse)"
     ]
   }
 }

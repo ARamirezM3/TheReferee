@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { supabase } from "../supabase";
 
 /* ---- Shared toggle components ---- */
 function Toggle({ on, onChange }) {
@@ -46,18 +47,43 @@ function InputField({ label, value, onChange, type }) {
 }
 
 /* ---- Panel: Cambiar Datos ---- */
-function CambiarDatosPanel({ onClose, avatarImg, setAvatarImg }) {
-  const [name, setName] = useState("Carlos");
-  const [birthDate, setBirthDate] = useState("1998-01-15");
-  const [weight, setWeight] = useState(75);
-  const [height, setHeight] = useState(180);
+function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarImg, onSaved }) {
+  const [name, setName] = useState(initialData?.nombre ?? "");
+  const [birthDate, setBirthDate] = useState(initialData?.fecha_nacimiento ?? "");
+  const [weight, setWeight] = useState(initialData?.peso ?? "");
+  const [height, setHeight] = useState(initialData?.altura ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const fileInputRef = useRef(null);
 
-  function handleFileChange(e) {
+  async function handleFileChange(e) {
     const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarImg(url);
+    if (!file || !userId) return;
+    const ext = file.name.split(".").pop();
+    const path = `${userId}.${ext}`;
+    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      setAvatarImg(url);
+      await supabase.from("usuarios").update({ foto_perfil: url }).eq("id", userId);
+    }
+  }
+
+  async function handleSave() {
+    if (!userId) return;
+    setSaving(true);
+    setSaveError("");
+    const { error } = await supabase.from("usuarios").update({
+      nombre: name,
+      fecha_nacimiento: birthDate || null,
+      peso: weight ? Number(weight) : null,
+      altura: height ? Number(height) : null,
+    }).eq("id", userId);
+    setSaving(false);
+    if (error) { setSaveError("Error al guardar. Inténtalo de nuevo."); return; }
+    onSaved?.({ nombre: name, fecha_nacimiento: birthDate, peso: weight, altura: height });
+    onClose();
   }
 
   return (
@@ -94,8 +120,13 @@ function CambiarDatosPanel({ onClose, avatarImg, setAvatarImg }) {
           <InputField label="Altura (cm)" value={height} onChange={setHeight} type="number" />
         </div>
 
-        <button style={{ width: "100%", background: "#7c3aed", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 16, fontWeight: 800, fontFamily: "Nunito,sans-serif", cursor: "pointer", marginTop: 24 }}>
-          Guardar cambios
+        {saveError && <div style={{ fontSize: 13, color: "#ef4444", fontWeight: 600, marginTop: 12 }}>{saveError}</div>}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{ width: "100%", background: "#7c3aed", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 16, fontWeight: 800, fontFamily: "Nunito,sans-serif", cursor: "pointer", marginTop: 16, opacity: saving ? 0.7 : 1 }}
+        >
+          {saving ? "Guardando..." : "Guardar cambios"}
         </button>
       </div>
     </div>
@@ -211,9 +242,27 @@ const MENU_ITEMS = [
   { label: "Términos legales", panel: null },
 ];
 
-export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, fontSize, setFontSize }) {
+export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, fontSize, setFontSize, currentUser }) {
   const [activePanel, setActivePanel] = useState(null);
   const [avatarImg, setAvatarImg] = useState(null);
+  const [userData, setUserData] = useState({ nombre: "", email: currentUser?.email ?? "", foto_perfil: "", fecha_nacimiento: "", peso: "", altura: "" });
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    supabase.from("usuarios").select("nombre,email,foto_perfil,fecha_nacimiento,peso,altura").eq("id", currentUser.id).single()
+      .then(({ data }) => {
+        if (!data) return;
+        setUserData({
+          nombre: data.nombre ?? "",
+          email: data.email ?? currentUser.email ?? "",
+          foto_perfil: data.foto_perfil ?? "",
+          fecha_nacimiento: data.fecha_nacimiento ?? "",
+          peso: data.peso ?? "",
+          altura: data.altura ?? "",
+        });
+        if (data.foto_perfil) setAvatarImg(data.foto_perfil);
+      });
+  }, [currentUser?.id]);
 
   return (
     <div className="screen">
@@ -233,8 +282,8 @@ export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, font
           </div>
           <button className="camera-btn" onClick={() => setActivePanel("cambiarDatos")}>📷</button>
         </div>
-        <div className="profile-name">Carlos</div>
-        <div className="profile-email">carloscarlos@gmail.com</div>
+        <div className="profile-name">{userData.nombre || "—"}</div>
+        <div className="profile-email">{userData.email}</div>
       </div>
 
       <div className="profile-menu">
@@ -249,8 +298,11 @@ export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, font
       {activePanel === "cambiarDatos" && (
         <CambiarDatosPanel
           onClose={() => setActivePanel(null)}
+          userId={currentUser?.id}
+          initialData={userData}
           avatarImg={avatarImg}
           setAvatarImg={setAvatarImg}
+          onSaved={(updated) => setUserData(d => ({ ...d, ...updated }))}
         />
       )}
       {activePanel === "preferencias" && (
