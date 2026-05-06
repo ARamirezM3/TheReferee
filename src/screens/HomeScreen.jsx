@@ -12,7 +12,7 @@ const INITIAL_CHART_DATA = [
 const COLOR_STOPS = [
   { v: 0.00, r: 34,  g: 197, b: 94  },
   { v: 0.20, r: 202, g: 138, b: 4   },
-  { v: 0.50, r: 239, g: 68,  b: 68  },
+  { v: 0.60, r: 239, g: 68,  b: 68  },
   { v: 1.00, r: 239, g: 68,  b: 68  },
 ];
 
@@ -38,9 +38,19 @@ function getCircleStyle(v, isPulsing) {
 }
 
 function getRefereeImage(v) {
-  if (v <= 0.01) return "/images/thereferee_bien.png";
-  if (v <= 0.25) return "/images/thereferee_amarilla.png";
+  if (v < 0.2) return "/images/thereferee_bien.png";
+  if (v < 0.6) return "/images/thereferee_amarilla.png";
   return "/images/thereferee_roja.png";
+}
+
+function calcEdad(fechaNacimiento) {
+  if (!fechaNacimiento) return null;
+  const hoy = new Date();
+  const nac = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad;
 }
 
 const AVATAR_COLORS = ["#3498db", "#e91e8c", "#e67e22", "#9b59b6", "#2ecc71"];
@@ -53,7 +63,7 @@ function PersonaCard({ persona, currentUser, onFollowed }) {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
   const bg = avatarColor(persona.id);
-  const letter = (persona.nombre || "?")[0].toUpperCase();
+  const letter = (persona.usuario || "?")[0].toUpperCase();
 
   async function handleFollow() {
     if (following || loading || !currentUser) return;
@@ -81,10 +91,10 @@ function PersonaCard({ persona, currentUser, onFollowed }) {
     <div className="persona-card">
       <div className="persona-avatar" style={{ background: bg, overflow: "hidden", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {persona.foto_perfil
-          ? <img src={persona.foto_perfil} alt={persona.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ? <img src={persona.foto_perfil} alt={persona.usuario} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           : <span style={{ color: "white", fontWeight: 800, fontSize: 18 }}>{letter}</span>}
       </div>
-      <div className="persona-name">{persona.nombre}</div>
+      <div className="persona-name">{persona.usuario}</div>
       <button
         className="persona-follow-btn"
         onClick={handleFollow}
@@ -104,24 +114,37 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
   const [personas, setPersonas] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [followedIds, setFollowedIds] = useState(new Set());
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    supabase.from("usuarios").select("usuario, peso, altura, fecha_nacimiento")
+      .eq("id", currentUser.id).single()
+      .then(({ data }) => setUserData(data));
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!currentUser) return;
     async function loadPersonas() {
-      const [{ data: sent }, { data: received }] = await Promise.all([
+      const [{ data: sent }, { data: received }, { data: pendingSent }, { data: pendingReceived }] = await Promise.all([
         supabase.from("amigos").select("amigo_id").eq("usuario_id", currentUser.id).eq("estado", "aceptado"),
         supabase.from("amigos").select("usuario_id").eq("amigo_id", currentUser.id).eq("estado", "aceptado"),
+        supabase.from("amigos").select("amigo_id").eq("usuario_id", currentUser.id).eq("estado", "pendiente"),
+        supabase.from("amigos").select("usuario_id").eq("amigo_id", currentUser.id).eq("estado", "pendiente"),
       ]);
-      const friendIds = [
+      const friendIds = new Set([
         ...(sent || []).map(a => a.amigo_id),
         ...(received || []).map(a => a.usuario_id),
-      ];
-      const { data: pendingSent } = await supabase.from("amigos").select("amigo_id").eq("usuario_id", currentUser.id).eq("estado", "pendiente");
-      const pendingIds = new Set((pendingSent || []).map(a => a.amigo_id));
+      ]);
+      const pendingIds = new Set([
+        ...(pendingSent || []).map(a => a.amigo_id),
+        ...(pendingReceived || []).map(a => a.usuario_id),
+      ]);
       setFollowedIds(pendingIds);
 
-      const { data } = await supabase.from("usuarios").select("id, nombre, foto_perfil").neq("id", currentUser.id).limit(10);
-      const filtered = (data || []).filter(u => !friendIds.includes(u.id)).slice(0, 5);
+      const excludeIds = new Set([...friendIds, ...pendingIds]);
+      const { data } = await supabase.from("usuarios").select("id, usuario, foto_perfil").neq("id", currentUser.id).limit(15);
+      const filtered = (data || []).filter(u => !excludeIds.has(u.id)).slice(0, 5);
       setPersonas(filtered);
     }
     loadPersonas();
@@ -136,8 +159,10 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
       .then(({ count }) => setUnreadCount(count || 0));
   }, [currentUser?.id]);
 
-  const isPositive = gl >= 0.50;
-  const isPulsing = gl > 0.60;
+  const isNegative = gl < 0.2;
+  const isWarning = gl >= 0.2 && gl < 0.6;
+  const isDangerous = gl >= 0.6;
+  const isPulsing = gl >= 0.6;
 
   function handleNewTest() {
     const newGl = parseFloat(Math.random().toFixed(2));
@@ -170,10 +195,10 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
       <div className="user-card">
         <div className="user-card-top">
           <div className="user-grid">
-            <span><b>Nombre:</b> Carlos</span>
-            <span><b>Edad:</b> 28 años</span>
-            <span><b>Peso:</b> 75 kg</span>
-            <span><b>Altura:</b> 180 cm</span>
+            <span><b>Usuario:</b> {userData?.usuario || "—"}</span>
+            <span><b>Edad:</b> {userData?.fecha_nacimiento ? calcEdad(userData.fecha_nacimiento) + " años" : "—"}</span>
+            <span><b>Peso:</b> {userData?.peso ? userData.peso + " kg" : "—"}</span>
+            <span><b>Altura:</b> {userData?.altura ? userData.altura + " cm" : "—"}</span>
           </div>
           <button className="mailbox-btn" onClick={handleOpenNotifications} title="Notificaciones" style={{ position: "relative" }}>
             <MailboxIcon />
@@ -198,17 +223,7 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
           <button className="share-btn"><ShareIcon /></button>
         </div>
 
-        {isPositive ? (
-          <div className="status-positive">
-            <div className="warning-row">
-              <WarningIcon />
-              <span className="positive-text">Has dado positivo</span>
-            </div>
-            <div className="status-btn red-status">NO APTO PARA CONDUCIR</div>
-            <button className="uber-btn"><span className="uber-logo">UBER</span><span>Llamar</span></button>
-            <button className="sos-btn">📞 <span>SOS 911</span></button>
-          </div>
-        ) : (
+        {isNegative && (
           <div className="status-negative">
             <div className="car-status-row">
               <CarIcon />
@@ -217,6 +232,26 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
                 <div className="status-sub">Has dado negativo</div>
               </div>
             </div>
+          </div>
+        )}
+        {isWarning && (
+          <div className="status-positive">
+            <div className="warning-row">
+              <WarningIcon />
+              <span className="positive-text">No apto para conducir</span>
+            </div>
+            <div className="status-btn red-status" style={{ background: "#ca8a04" }}>NO APTO PARA CONDUCIR</div>
+            <button className="uber-btn"><span className="uber-logo">UBER</span><span>Llamar</span></button>
+          </div>
+        )}
+        {isDangerous && (
+          <div className="status-positive">
+            <div className="warning-row">
+              <WarningIcon />
+              <span className="positive-text">Nivel peligroso</span>
+            </div>
+            <div className="status-btn red-status">NIVEL PELIGROSO</div>
+            <button className="sos-btn">📞 <span>Llamar al 112</span></button>
           </div>
         )}
       </div>

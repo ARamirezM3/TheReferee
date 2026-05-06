@@ -46,14 +46,65 @@ function avatarColor(id) {
   return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];
 }
 
-function MiniAvatar({ userId, nombre, fotoPerfil, size = 38 }) {
+function MiniAvatar({ userId, usuario, fotoPerfil, size = 38 }) {
   const bg = avatarColor(userId);
-  const letter = (nombre || "?")[0].toUpperCase();
+  const letter = (usuario || "?")[0].toUpperCase();
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: bg, flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
       {fotoPerfil
-        ? <img src={fotoPerfil} alt={nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ? <img src={fotoPerfil} alt={usuario} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         : <span style={{ color: "white", fontWeight: 800, fontSize: Math.round(size * 0.38) }}>{letter}</span>}
+    </div>
+  );
+}
+
+function calcEdad(fechaNacimiento) {
+  if (!fechaNacimiento) return null;
+  const hoy = new Date();
+  const nac = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad;
+}
+
+function UserProfileModal({ user, onClose }) {
+  const [fullData, setFullData] = useState(null);
+  useEffect(() => {
+    supabase.from("usuarios").select("usuario, foto_perfil, peso, altura, fecha_nacimiento, created_at")
+      .eq("id", user.id).single()
+      .then(({ data }) => setFullData(data));
+  }, [user.id]);
+  const rows = fullData ? [
+    { label: "Peso", value: fullData.peso ? `${fullData.peso} kg` : "—" },
+    { label: "Altura", value: fullData.altura ? `${fullData.altura} cm` : "—" },
+    { label: "Edad", value: fullData.fecha_nacimiento ? `${calcEdad(fullData.fecha_nacimiento)} años` : "—" },
+    { label: "En la app desde", value: fullData.created_at ? new Date(fullData.created_at).toLocaleDateString("es-ES", { month: "long", year: "numeric" }) : "—" },
+  ] : [];
+  return (
+    <div className="slide-panel" style={{ zIndex: 55 }}>
+      <header className="panel-header">
+        <button className="panel-back" onClick={onClose}>←</button>
+        <h2 className="panel-title">Perfil</h2>
+        <span />
+      </header>
+      <div className="panel-body" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <MiniAvatar userId={user.id} usuario={fullData?.usuario || user.usuario} fotoPerfil={fullData?.foto_perfil || user.foto_perfil} size={80} />
+        <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", marginTop: 12 }}>
+          @{fullData?.usuario || user.usuario || "—"}
+        </div>
+        {!fullData && <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 16 }}>Cargando...</p>}
+        {fullData && (
+          <div style={{ marginTop: 24, width: "100%", background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+            {rows.map((row, i) => (
+              <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "14px 16px", borderBottom: i < rows.length - 1 ? "1px solid var(--border)" : "none" }}>
+                <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 600 }}>{row.label}</span>
+                <span style={{ fontSize: 14, color: "var(--text)", fontWeight: 700 }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -105,8 +156,8 @@ function NotificacionesPanel({ currentUser, onClose }) {
   useEffect(() => {
     if (!currentUser) return;
     async function load() {
-      const { data: meData } = await supabase.from("usuarios").select("nombre").eq("id", currentUser.id).single();
-      setCurrentUserName(meData?.nombre || "");
+      const { data: meData } = await supabase.from("usuarios").select("usuario").eq("id", currentUser.id).single();
+      setCurrentUserName(meData?.usuario || "");
 
       const { data: pendingRows } = await supabase
         .from("amigos").select("id, usuario_id")
@@ -114,7 +165,7 @@ function NotificacionesPanel({ currentUser, onClose }) {
 
       if (pendingRows && pendingRows.length > 0) {
         const senderIds = pendingRows.map(r => r.usuario_id);
-        const { data: senders } = await supabase.from("usuarios").select("id, nombre, foto_perfil").in("id", senderIds);
+        const { data: senders } = await supabase.from("usuarios").select("id, usuario, foto_perfil").in("id", senderIds);
         setRequests(pendingRows.map(r => ({ ...r, sender: senders?.find(s => s.id === r.usuario_id) })));
       }
 
@@ -127,7 +178,7 @@ function NotificacionesPanel({ currentUser, onClose }) {
         const senderIds = [...new Set(notifs.map(n => n.de_usuario_id).filter(Boolean))];
         let sendersMap = {};
         if (senderIds.length > 0) {
-          const { data: sendersData } = await supabase.from("usuarios").select("id, nombre, foto_perfil").in("id", senderIds);
+          const { data: sendersData } = await supabase.from("usuarios").select("id, usuario, foto_perfil").in("id", senderIds);
           sendersMap = Object.fromEntries((sendersData || []).map(s => [s.id, s]));
         }
         setActivity(notifs.map(n => ({ ...n, sender: sendersMap[n.de_usuario_id] })));
@@ -144,10 +195,10 @@ function NotificacionesPanel({ currentUser, onClose }) {
   async function handleAccept(req) {
     await supabase.from("amigos").update({ estado: "aceptado" }).eq("id", req.id);
     await supabase.from("notificaciones").insert([
-      { usuario_id: currentUser.id, de_usuario_id: req.usuario_id, tipo: "amigos_aceptado", mensaje: `Ahora tú y ${req.sender?.nombre || "alguien"} sois amigos`, leida: false },
+      { usuario_id: currentUser.id, de_usuario_id: req.usuario_id, tipo: "amigos_aceptado", mensaje: `Ahora tú y ${req.sender?.usuario || "alguien"} sois amigos`, leida: false },
       { usuario_id: req.usuario_id, de_usuario_id: currentUser.id, tipo: "amigos_aceptado", mensaje: `${currentUserName || "Alguien"} aceptó tu solicitud. ¡Ahora sois amigos!`, leida: false },
     ]);
-    setActivity(prev => [{ id: Date.now(), mensaje: `Ahora tú y ${req.sender?.nombre || "alguien"} sois amigos`, tipo: "amigos_aceptado", sender: req.sender }, ...prev]);
+    setActivity(prev => [{ id: Date.now(), mensaje: `Ahora tú y ${req.sender?.usuario || "alguien"} sois amigos`, tipo: "amigos_aceptado", sender: req.sender }, ...prev]);
     setRequests(prev => prev.filter(r => r.id !== req.id));
   }
 
@@ -171,8 +222,8 @@ function NotificacionesPanel({ currentUser, onClose }) {
             ? <p className="notif-empty">No hay solicitudes pendientes</p>
             : requests.map(r => (
               <div key={r.id} className="friend-request-row">
-                <MiniAvatar userId={r.usuario_id} nombre={r.sender?.nombre} fotoPerfil={r.sender?.foto_perfil} />
-                <span className="notif-name">{r.sender?.nombre || "Usuario"}</span>
+                <MiniAvatar userId={r.usuario_id} usuario={r.sender?.usuario} fotoPerfil={r.sender?.foto_perfil} />
+                <span className="notif-name">{r.sender?.usuario || "Usuario"}</span>
                 <button className="friend-btn accept" onClick={() => handleAccept(r)}>Aceptar</button>
                 <button className="friend-btn reject" onClick={() => handleReject(r)}>Rechazar</button>
               </div>
@@ -182,7 +233,7 @@ function NotificacionesPanel({ currentUser, onClose }) {
         {!loading && activity.length === 0 && <p className="notif-empty">No hay actividad reciente</p>}
         {activity.map(a => (
           <div key={a.id} className="activity-row">
-            <MiniAvatar userId={a.de_usuario_id} nombre={a.sender?.nombre} fotoPerfil={a.sender?.foto_perfil} />
+            <MiniAvatar userId={a.de_usuario_id} usuario={a.sender?.usuario} fotoPerfil={a.sender?.foto_perfil} />
             <span className="notif-text">{a.mensaje}</span>
           </div>
         ))}
@@ -281,6 +332,7 @@ function AmigosPanel({ currentUser, onClose }) {
   const [amigos, setAmigos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -291,45 +343,49 @@ function AmigosPanel({ currentUser, onClose }) {
       ]);
       const ids = [...(sent || []).map(a => a.amigo_id), ...(received || []).map(a => a.usuario_id)];
       if (ids.length === 0) { setLoading(false); return; }
-      const { data: users } = await supabase.from("usuarios").select("id, nombre, foto_perfil").in("id", ids);
+      const { data: users } = await supabase.from("usuarios").select("id, usuario, foto_perfil").in("id", ids);
       setAmigos(users || []);
       setLoading(false);
     }
     load();
   }, [currentUser?.id]);
 
-  const filtered = amigos.filter(f => !search || f.nombre?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = amigos.filter(f => !search || f.usuario?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="slide-panel">
-      <header className="panel-header">
-        <button className="panel-back" onClick={onClose}>←</button>
-        <h2 className="panel-title">Amigos</h2>
-        <span />
-      </header>
-      <div className="panel-body">
-        <input type="text" placeholder="Buscar amigos..." value={search} onChange={e => setSearch(e.target.value)}
-          style={{ width: "100%", padding: "10px 14px", border: "2px solid var(--border)", borderRadius: 10, fontSize: 14, fontFamily: "Nunito,sans-serif", color: "var(--text)", marginBottom: 16, outline: "none", background: "white" }} />
-        {loading
-          ? <p style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px 0" }}>Cargando...</p>
-          : filtered.length === 0
-            ? <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 14, padding: "24px 0" }}>
-                {amigos.length === 0 ? "Aún no tienes amigos" : "No se encontraron resultados"}
-              </p>
-            : (
-              <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-                {filtered.map((f, i) => (
-                  <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}>
-                    <MiniAvatar userId={f.id} nombre={f.nombre} fotoPerfil={f.foto_perfil} />
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{f.nombre}</span>
-                    <span style={{ color: "var(--text-muted)", fontSize: 20 }}>›</span>
-                  </div>
-                ))}
-              </div>
-            )
-        }
+    <>
+      <div className="slide-panel">
+        <header className="panel-header">
+          <button className="panel-back" onClick={onClose}>←</button>
+          <h2 className="panel-title">Amigos</h2>
+          <span />
+        </header>
+        <div className="panel-body">
+          <input type="text" placeholder="Buscar amigos..." value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", padding: "10px 14px", border: "2px solid var(--border)", borderRadius: 10, fontSize: 14, fontFamily: "Nunito,sans-serif", color: "var(--text)", marginBottom: 16, outline: "none", background: "white" }} />
+          {loading
+            ? <p style={{ textAlign: "center", color: "var(--text-muted)", padding: "24px 0" }}>Cargando...</p>
+            : filtered.length === 0
+              ? <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 14, padding: "24px 0" }}>
+                  {amigos.length === 0 ? "Aún no tienes amigos" : "No se encontraron resultados"}
+                </p>
+              : (
+                <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                  {filtered.map((f, i) => (
+                    <div key={f.id} onClick={() => setSelectedUser(f)}
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>
+                      <MiniAvatar userId={f.id} usuario={f.usuario} fotoPerfil={f.foto_perfil} />
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{f.usuario}</span>
+                      <span style={{ color: "var(--text-muted)", fontSize: 20 }}>›</span>
+                    </div>
+                  ))}
+                </div>
+              )
+          }
+        </div>
       </div>
-    </div>
+      {selectedUser && <UserProfileModal user={selectedUser} onClose={() => setSelectedUser(null)} />}
+    </>
   );
 }
 
@@ -616,7 +672,8 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUser(session?.user ?? null);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") setActiveTab("home");
       setCurrentUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();

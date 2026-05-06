@@ -37,7 +37,7 @@ function InputField({ label, value, onChange, type }) {
 
 /* ---- Panel: Cambiar Datos ---- */
 function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarImg, onSaved }) {
-  const [name, setName] = useState(initialData?.nombre ?? "");
+  const [name, setName] = useState(initialData?.usuario ?? "");
   const [birthDate, setBirthDate] = useState(initialData?.fecha_nacimiento ?? "");
   const [weight, setWeight] = useState(initialData?.peso ?? "");
   const [height, setHeight] = useState(initialData?.altura ?? "");
@@ -64,14 +64,14 @@ function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarI
     setSaving(true);
     setSaveError("");
     const { error } = await supabase.from("usuarios").update({
-      nombre: name,
+      usuario: name.trim(),
       fecha_nacimiento: birthDate || null,
       peso: weight ? Number(weight) : null,
       altura: height ? Number(height) : null,
     }).eq("id", userId);
     setSaving(false);
     if (error) { setSaveError("Error al guardar. Inténtalo de nuevo."); return; }
-    onSaved?.({ nombre: name, fecha_nacimiento: birthDate, peso: weight, altura: height });
+    onSaved?.({ usuario: name.trim(), fecha_nacimiento: birthDate, peso: weight, altura: height });
     onClose();
   }
 
@@ -101,7 +101,7 @@ function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarI
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <InputField label="Nombre" value={name} onChange={setName} type="text" />
+          <InputField label="Usuario" value={name} onChange={val => setName(val.slice(0, 30))} type="text" />
           <InputField label="Fecha de nacimiento" value={birthDate} onChange={setBirthDate} type="date" />
           <InputField label="Peso (kg)" value={weight} onChange={setWeight} type="number" />
           <InputField label="Altura (cm)" value={height} onChange={setHeight} type="number" />
@@ -236,15 +236,15 @@ const MENU_ITEMS = [
 export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, fontSize, setFontSize, currentUser }) {
   const [activePanel, setActivePanel] = useState(null);
   const [avatarImg, setAvatarImg] = useState(null);
-  const [userData, setUserData] = useState({ nombre: "", email: currentUser?.email ?? "", foto_perfil: "", fecha_nacimiento: "", peso: "", altura: "" });
+  const [userData, setUserData] = useState({ usuario: "", email: currentUser?.email ?? "", foto_perfil: "", fecha_nacimiento: "", peso: "", altura: "" });
 
   useEffect(() => {
     if (!currentUser?.id) return;
-    supabase.from("usuarios").select("nombre,email,foto_perfil,fecha_nacimiento,peso,altura").eq("id", currentUser.id).single()
+    supabase.from("usuarios").select("usuario,email,foto_perfil,fecha_nacimiento,peso,altura").eq("id", currentUser.id).single()
       .then(({ data }) => {
         if (!data) return;
         setUserData({
-          nombre: data.nombre ?? "",
+          usuario: data.usuario ?? "",
           email: data.email ?? currentUser.email ?? "",
           foto_perfil: data.foto_perfil ?? "",
           fecha_nacimiento: data.fecha_nacimiento ?? "",
@@ -256,7 +256,7 @@ export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, font
   }, [currentUser?.id]);
 
   const avatarBg = avatarColor(currentUser?.id);
-  const avatarLetter = (userData.nombre || currentUser?.email || "?")[0].toUpperCase();
+  const avatarLetter = (userData.usuario || currentUser?.email || "?")[0].toUpperCase();
 
   return (
     <div className="screen">
@@ -275,7 +275,7 @@ export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, font
           </div>
           <button className="camera-btn" onClick={() => setActivePanel("cambiarDatos")}>📷</button>
         </div>
-        <div className="profile-name">{userData.nombre || "—"}</div>
+        <div className="profile-name">{userData.usuario || "—"}</div>
         <div className="profile-email">{userData.email}</div>
       </div>
 
