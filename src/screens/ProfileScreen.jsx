@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "../supabase";
+import { getT } from "../i18n";
 
 const AVATAR_COLORS = ["#3498db", "#e91e8c", "#e67e22", "#9b59b6", "#2ecc71"];
 function avatarColor(id) {
@@ -7,7 +8,6 @@ function avatarColor(id) {
   return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];
 }
 
-/* ---- Shared toggle components ---- */
 function Toggle({ on, onChange }) {
   return (
     <button onClick={() => onChange(!on)} style={{ width: 44, height: 24, borderRadius: 12, background: on ? "#7c3aed" : "#d1d5db", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
@@ -30,13 +30,14 @@ function InputField({ label, value, onChange, type }) {
     <div>
       <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: "100%", padding: "12px", border: "2px solid var(--border)", borderRadius: 10, fontSize: 14, fontFamily: "Nunito,sans-serif", color: "var(--text)", outline: "none", background: "white" }} />
+        style={{ width: "100%", padding: "12px", border: "2px solid var(--border)", borderRadius: 10, fontSize: 14, fontFamily: "Nunito,sans-serif", color: "var(--text)", outline: "none", background: "var(--input-bg)" }} />
     </div>
   );
 }
 
 /* ---- Panel: Cambiar Datos ---- */
-function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarImg, onSaved }) {
+function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarImg, onSaved, lang }) {
+  const t = getT(lang);
   const [name, setName] = useState(initialData?.usuario ?? "");
   const [birthDate, setBirthDate] = useState(initialData?.fecha_nacimiento ?? "");
   const [weight, setWeight] = useState(initialData?.peso ?? "");
@@ -70,7 +71,7 @@ function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarI
       altura: height ? Number(height) : null,
     }).eq("id", userId);
     setSaving(false);
-    if (error) { setSaveError("Error al guardar. Inténtalo de nuevo."); return; }
+    if (error) { setSaveError(t.errorSaving); return; }
     onSaved?.({ usuario: name.trim(), fecha_nacimiento: birthDate, peso: weight, altura: height });
     onClose();
   }
@@ -82,7 +83,7 @@ function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarI
     <div className="slide-panel" style={{ zIndex: 53 }}>
       <header className="panel-header">
         <button className="panel-back" onClick={onClose}>←</button>
-        <h2 className="panel-title">Mis datos</h2>
+        <h2 className="panel-title">{t.myData}</h2>
         <span />
       </header>
       <div className="panel-body">
@@ -99,18 +100,16 @@ function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarI
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
           </div>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <InputField label="Usuario" value={name} onChange={val => setName(val.slice(0, 30))} type="text" />
-          <InputField label="Fecha de nacimiento" value={birthDate} onChange={setBirthDate} type="date" />
-          <InputField label="Peso (kg)" value={weight} onChange={setWeight} type="number" />
-          <InputField label="Altura (cm)" value={height} onChange={setHeight} type="number" />
+          <InputField label={t.usernameField} value={name} onChange={val => setName(val.slice(0, 30))} type="text" />
+          <InputField label={t.birthDateField} value={birthDate} onChange={setBirthDate} type="date" />
+          <InputField label={t.weightField} value={weight} onChange={setWeight} type="number" />
+          <InputField label={t.heightField} value={height} onChange={setHeight} type="number" />
         </div>
-
         {saveError && <div style={{ fontSize: 13, color: "#ef4444", fontWeight: 600, marginTop: 12 }}>{saveError}</div>}
         <button onClick={handleSave} disabled={saving}
           style={{ width: "100%", background: "#7c3aed", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 16, fontWeight: 800, fontFamily: "Nunito,sans-serif", cursor: "pointer", marginTop: 16, opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Guardando..." : "Guardar cambios"}
+          {saving ? t.saving : t.saveChanges}
         </button>
       </div>
     </div>
@@ -118,23 +117,28 @@ function CambiarDatosPanel({ onClose, userId, initialData, avatarImg, setAvatarI
 }
 
 /* ---- Panel: Preferencias ---- */
-function PreferenciasPanel({ onClose, darkMode, setDarkMode, fontSize, setFontSize }) {
-  const FONT_OPTIONS = ["Pequeño", "Normal", "Grande", "Muy grande"];
+function PreferenciasPanel({ onClose, darkMode, setDarkMode, fontSize, setFontSize, lang, setLang }) {
+  const t = getT(lang);
+  const FONT_OPTIONS = [t.fontSmall, t.fontNormal, t.fontLarge, t.fontXlarge];
   const fontIndexMap = { small: 0, normal: 1, large: 2, xlarge: 3 };
   const fontSizeKeys = ["small", "normal", "large", "xlarge"];
   const fontIndex = fontIndexMap[fontSize] ?? 1;
-  const [idioma, setIdioma] = useState("Español");
+
+  function handleLangChange(newLang) {
+    setLang(newLang);
+    localStorage.setItem("thereferee_lang", newLang);
+  }
 
   return (
     <div className="slide-panel" style={{ zIndex: 53 }}>
       <header className="panel-header">
         <button className="panel-back" onClick={onClose}>←</button>
-        <h2 className="panel-title">Preferencias</h2>
+        <h2 className="panel-title">{t.preferences}</h2>
         <span />
       </header>
       <div className="panel-body">
-        <div className="panel-section-title">Tamaño de fuente</div>
-        <div style={{ background: "white", borderRadius: 12, padding: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
+        <div className="panel-section-title">{t.fontSizeLabel}</div>
+        <div style={{ background: "var(--surface)", borderRadius: 12, padding: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
           <input type="range" min={0} max={3} step={1} value={fontIndex} onChange={e => setFontSize(fontSizeKeys[parseInt(e.target.value)])} style={{ width: "100%", accentColor: "#7c3aed" }} />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
             {FONT_OPTIONS.map((opt, i) => (
@@ -142,18 +146,18 @@ function PreferenciasPanel({ onClose, darkMode, setDarkMode, fontSize, setFontSi
             ))}
           </div>
         </div>
-        <div className="panel-section-title">Idioma</div>
-        <div style={{ background: "white", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 16, display: "flex" }}>
-          {["Español", "English"].map(lang => (
-            <button key={lang} onClick={() => setIdioma(lang)}
-              style={{ flex: 1, padding: "12px 0", border: "none", cursor: "pointer", background: idioma === lang ? "#7c3aed" : "white", color: idioma === lang ? "white" : "var(--text)", fontWeight: 700, fontSize: 14, fontFamily: "Nunito,sans-serif", transition: "background 0.2s, color 0.2s" }}>
-              {lang}
+        <div className="panel-section-title">{t.languageLabel}</div>
+        <div style={{ background: "var(--surface)", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 16, display: "flex" }}>
+          {[["es", "Español"], ["en", "English"]].map(([code, label]) => (
+            <button key={code} onClick={() => handleLangChange(code)}
+              style={{ flex: 1, padding: "12px 0", border: "none", cursor: "pointer", background: lang === code ? "#7c3aed" : "var(--surface)", color: lang === code ? "white" : "var(--text)", fontWeight: 700, fontSize: 14, fontFamily: "Nunito,sans-serif", transition: "background 0.2s, color 0.2s" }}>
+              {label}
             </button>
           ))}
         </div>
-        <div className="panel-section-title">Apariencia</div>
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-          <ToggleRow label="Modo oscuro" on={darkMode} onChange={setDarkMode} last />
+        <div className="panel-section-title">{t.appearanceLabel}</div>
+        <div style={{ background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+          <ToggleRow label={t.darkModeLabel} on={darkMode} onChange={setDarkMode} last />
         </div>
       </div>
     </div>
@@ -161,27 +165,28 @@ function PreferenciasPanel({ onClose, darkMode, setDarkMode, fontSize, setFontSi
 }
 
 /* ---- Panel: Notificaciones (preferencias) ---- */
-function NotificacionesPanel({ onClose }) {
+function NotificacionesPanel({ onClose, lang }) {
+  const t = getT(lang);
   const [notifs, setNotifs] = useState({ amistad: true, aceptada: true, grupo: true, nuevoTest: false, recordatorio: false, foto: true, nuevaPersona: false });
   function toggle(key) { setNotifs(p => ({ ...p, [key]: !p[key] })); }
   const items = [
-    { key: "amistad", label: "Solicitudes de amistad" },
-    { key: "aceptada", label: "Solicitudes aceptadas" },
-    { key: "grupo", label: "Añadido a un grupo" },
-    { key: "nuevoTest", label: "Nuevo test en un grupo" },
-    { key: "recordatorio", label: "Recordatorios de tomar test" },
-    { key: "foto", label: "Nueva foto en un grupo" },
-    { key: "nuevaPersona", label: "Nueva persona añadida al grupo" },
+    { key: "amistad", label: t.notifFriendRequest },
+    { key: "aceptada", label: t.notifAccepted },
+    { key: "grupo", label: t.notifGroup },
+    { key: "nuevoTest", label: t.notifNewTest },
+    { key: "recordatorio", label: t.notifReminder },
+    { key: "foto", label: t.notifPhoto },
+    { key: "nuevaPersona", label: t.notifNewPerson },
   ];
   return (
     <div className="slide-panel" style={{ zIndex: 53 }}>
       <header className="panel-header">
         <button className="panel-back" onClick={onClose}>←</button>
-        <h2 className="panel-title">Notificaciones</h2>
+        <h2 className="panel-title">{t.notifSettings}</h2>
         <span />
       </header>
       <div className="panel-body">
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+        <div style={{ background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
           {items.map((item, i) => (
             <ToggleRow key={item.key} label={item.label} on={notifs[item.key]} onChange={() => toggle(item.key)} last={i === items.length - 1} />
           ))}
@@ -192,14 +197,15 @@ function NotificacionesPanel({ onClose }) {
 }
 
 /* ---- Panel: Términos legales ---- */
-function TerminosLegalesPanel({ onClose }) {
+function TerminosLegalesPanel({ onClose, lang }) {
+  const t = getT(lang);
   const sections = [
     { title: "Política de privacidad", body: null },
     { title: "Quiénes somos", body: "Somos un grupo de estudiantes desarrollando TheReferee, un proyecto tecnológico cuyo objetivo es mejorar la seguridad en entornos sociales mediante el uso de un alcoholímetro conectado a una aplicación móvil. Nuestro propósito es ofrecer una herramienta útil, accesible y responsable para el control del consumo de alcohol." },
-    { title: "Comentarios", body: "Cuando los usuarios dejan comentarios en nuestra web, recopilamos la información introducida en el formulario, junto con la dirección IP y los datos del navegador, con el fin de prevenir el spam. Además, es posible que se genere un identificador anónimo (hash) a partir del correo electrónico que puede enviarse al servicio Gravatar para comprobar si está asociado a una cuenta. Una vez aprobado el comentario, la imagen de perfil vinculada será visible públicamente." },
-    { title: "Medios", body: "En caso de subir imágenes a la web, se recomienda evitar aquellas que contengan datos de localización incrustados (EXIF GPS), ya que otros usuarios podrían descargarlas y acceder a dicha información." },
-    { title: "Cookies", body: "Si dejas un comentario, puedes elegir guardar tu nombre, correo electrónico y sitio web en cookies para facilitar futuras interacciones. Estas cookies tendrán una duración de un año. Al acceder a la página de inicio de sesión, se creará una cookie temporal para comprobar si tu navegador admite cookies. Cuando inicias sesión, se almacenan varias cookies relacionadas con tus datos de acceso y preferencias de visualización. Las cookies de inicio de sesión duran dos días, mientras que las de configuración de pantalla se conservan durante un año." },
-    { title: "Contenido incrustado de otros sitios web", body: "El contenido de este sitio puede incluir elementos incrustados como vídeos, imágenes o artículos. Este tipo de contenido se comporta como si el usuario accediera directamente a la web de origen." },
+    { title: "Comentarios", body: "Cuando los usuarios dejan comentarios en nuestra web, recopilamos la información introducida en el formulario, junto con la dirección IP y los datos del navegador, con el fin de prevenir el spam." },
+    { title: "Medios", body: "En caso de subir imágenes a la web, se recomienda evitar aquellas que contengan datos de localización incrustados (EXIF GPS)." },
+    { title: "Cookies", body: "Si dejas un comentario, puedes elegir guardar tu nombre, correo electrónico y sitio web en cookies para facilitar futuras interacciones. Estas cookies tendrán una duración de un año." },
+    { title: "Contenido incrustado", body: "El contenido de este sitio puede incluir elementos incrustados como vídeos, imágenes o artículos. Este tipo de contenido se comporta como si el usuario accediera directamente a la web de origen." },
     { title: "Con quién compartimos tus datos", body: "En caso de solicitar un cambio de contraseña, la dirección IP del usuario se incluirá en el correo electrónico correspondiente por motivos de seguridad." },
     { title: "Cuánto tiempo conservamos tus datos", body: "Los comentarios realizados se almacenan de forma indefinida. Los usuarios registrados pueden consultar, modificar o eliminar sus datos en cualquier momento." },
     { title: "Qué derechos tienes sobre tus datos", body: "Puedes solicitar un archivo con tus datos personales o pedir su eliminación, salvo los que deban conservarse por razones legales." },
@@ -210,7 +216,7 @@ function TerminosLegalesPanel({ onClose }) {
     <div className="slide-panel" style={{ zIndex: 53 }}>
       <header className="panel-header">
         <button className="panel-back" onClick={onClose}>←</button>
-        <h2 className="panel-title">Términos legales</h2>
+        <h2 className="panel-title">{t.legalTerms}</h2>
         <span />
       </header>
       <div className="panel-body">
@@ -225,15 +231,16 @@ function TerminosLegalesPanel({ onClose }) {
   );
 }
 
+/* --- Cambio #11: Eliminado "Valora la app" del menú --- */
 const MENU_ITEMS = [
-  { label: "Cambiar Datos", panel: "cambiarDatos" },
-  { label: "Preferencias", panel: "preferencias" },
-  { label: "Notificaciones", panel: "notificaciones" },
-  { label: "Valora la app", panel: null },
-  { label: "Términos legales", panel: "terminos" },
+  { key: "editData", panel: "cambiarDatos" },
+  { key: "preferences", panel: "preferencias" },
+  { key: "notifSettings", panel: "notificaciones" },
+  { key: "legalTerms", panel: "terminos" },
 ];
 
-export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, fontSize, setFontSize, currentUser }) {
+export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, fontSize, setFontSize, currentUser, lang, setLang }) {
+  const t = getT(lang);
   const [activePanel, setActivePanel] = useState(null);
   const [avatarImg, setAvatarImg] = useState(null);
   const [userData, setUserData] = useState({ usuario: "", email: currentUser?.email ?? "", foto_perfil: "", fecha_nacimiento: "", peso: "", altura: "" });
@@ -281,8 +288,8 @@ export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, font
 
       <div className="profile-menu">
         {MENU_ITEMS.map((item) => (
-          <button key={item.label} className="menu-item" onClick={() => item.panel && setActivePanel(item.panel)}>
-            <span>{item.label}</span>
+          <button key={item.key} className="menu-item" onClick={() => item.panel && setActivePanel(item.panel)}>
+            <span>{t[item.key]}</span>
             <span className="menu-arrow">›</span>
           </button>
         ))}
@@ -296,13 +303,22 @@ export default function ProfileScreen({ onHamburger, darkMode, setDarkMode, font
           avatarImg={avatarImg}
           setAvatarImg={setAvatarImg}
           onSaved={(updated) => setUserData(d => ({ ...d, ...updated }))}
+          lang={lang}
         />
       )}
       {activePanel === "preferencias" && (
-        <PreferenciasPanel onClose={() => setActivePanel(null)} darkMode={darkMode} setDarkMode={setDarkMode} fontSize={fontSize} setFontSize={setFontSize} />
+        <PreferenciasPanel
+          onClose={() => setActivePanel(null)}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          fontSize={fontSize}
+          setFontSize={setFontSize}
+          lang={lang}
+          setLang={setLang}
+        />
       )}
-      {activePanel === "notificaciones" && <NotificacionesPanel onClose={() => setActivePanel(null)} />}
-      {activePanel === "terminos" && <TerminosLegalesPanel onClose={() => setActivePanel(null)} />}
+      {activePanel === "notificaciones" && <NotificacionesPanel onClose={() => setActivePanel(null)} lang={lang} />}
+      {activePanel === "terminos" && <TerminosLegalesPanel onClose={() => setActivePanel(null)} lang={lang} />}
     </div>
   );
 }

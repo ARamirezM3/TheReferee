@@ -1,13 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
+import { getT } from "../i18n";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
-
-const INITIAL_CHART_DATA = [
-  { t: "1", gl: 0.05 }, { t: "2", gl: 0.10 }, { t: "3", gl: 0.30 },
-  { t: "4", gl: 0.55 }, { t: "5", gl: 0.72 }, { t: "6", gl: 0.60 },
-  { t: "7", gl: 0.45 }, { t: "8", gl: 0.30 }, { t: "9", gl: 0.15 },
-  { t: "10", gl: 0.05 },
-];
 
 const COLOR_STOPS = [
   { v: 0.00, r: 34,  g: 197, b: 94  },
@@ -59,7 +53,8 @@ function avatarColor(id) {
   return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];
 }
 
-function PersonaCard({ persona, currentUser, onFollowed }) {
+function PersonaCard({ persona, currentUser, onFollowed, lang }) {
+  const t = getT(lang);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
   const bg = avatarColor(persona.id);
@@ -101,21 +96,25 @@ function PersonaCard({ persona, currentUser, onFollowed }) {
         disabled={following || loading}
         style={following ? { background: "#e5e7eb", color: "#374151" } : loading ? { opacity: 0.7 } : {}}
       >
-        {following ? "Solicitado" : "Seguir"}
+        {following ? t.requested : t.follow}
       </button>
     </div>
   );
 }
 
-export default function HomeScreen({ onHamburger, onOpenNotifications, currentUser }) {
+export default function HomeScreen({ onHamburger, onOpenNotifications, currentUser, lang }) {
+  const t = getT(lang);
   const [gl, setGl] = useState(0.05);
   const [testKey, setTestKey] = useState(0);
-  const [chartData, setChartData] = useState(INITIAL_CHART_DATA);
+  const [chartData, setChartData] = useState([{ t: "1", gl: 0.05 }]);
   const [personas, setPersonas] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [followedIds, setFollowedIds] = useState(new Set());
   const [userData, setUserData] = useState(null);
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [hasTest, setHasTest] = useState(false);
 
+  // Load user data
   useEffect(() => {
     if (!currentUser) return;
     supabase.from("usuarios").select("usuario, peso, altura, fecha_nacimiento")
@@ -123,6 +122,25 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
       .then(({ data }) => setUserData(data));
   }, [currentUser?.id]);
 
+  // Load last tests from DB for chart persistence
+  useEffect(() => {
+    if (!currentUser) return;
+    supabase.from("tests")
+      .select("valor_gl, created_at")
+      .eq("usuario_id", currentUser.id)
+      .order("created_at", { ascending: true })
+      .limit(10)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setChartData(data.map((item, i) => ({ t: String(i + 1), gl: parseFloat(item.valor_gl) })));
+          const last = data[data.length - 1];
+          setGl(parseFloat(last.valor_gl));
+          setHasTest(true);
+        }
+      });
+  }, [currentUser?.id]);
+
+  // Load personas
   useEffect(() => {
     if (!currentUser) return;
     async function loadPersonas() {
@@ -141,7 +159,6 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
         ...(pendingReceived || []).map(a => a.usuario_id),
       ]);
       setFollowedIds(pendingIds);
-
       const excludeIds = new Set([...friendIds, ...pendingIds]);
       const { data } = await supabase.from("usuarios").select("id, usuario, foto_perfil").neq("id", currentUser.id).limit(15);
       const filtered = (data || []).filter(u => !excludeIds.has(u.id)).slice(0, 5);
@@ -150,6 +167,7 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
     loadPersonas();
   }, [currentUser?.id]);
 
+  // Unread notifications count
   useEffect(() => {
     if (!currentUser) return;
     supabase.from("notificaciones")
@@ -164,14 +182,36 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
   const isDangerous = gl >= 0.6;
   const isPulsing = gl >= 0.6;
 
-  function handleNewTest() {
+  const shareState = isNegative ? t.shareStateOk : isWarning ? t.shareStateWarning : t.shareStateDanger;
+  const shareMessage = `${t.shareTextPrefix} ${gl.toFixed(2)} g/L - ${shareState}`;
+
+  async function handleNewTest() {
     const newGl = parseFloat(Math.random().toFixed(2));
+    // Save to Supabase
+    await supabase.from("tests").insert({
+      usuario_id: currentUser.id,
+      valor_gl: newGl,
+      fecha: new Date().toISOString().slice(0, 10),
+    });
+    // Update chart
     setChartData(prev => {
       const lastT = prev.length > 0 ? parseInt(prev[prev.length - 1].t) : 0;
       return [...prev, { t: String(lastT + 1), gl: newGl }].slice(-10);
     });
     setGl(newGl);
     setTestKey(k => k + 1);
+    setHasTest(true);
+    setShowShareOptions(false);
+  }
+
+  async function handleShare() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "TheReferee", text: shareMessage });
+      } catch (_) { /* user cancelled */ }
+    } else {
+      setShowShareOptions(s => !s);
+    }
   }
 
   function handleOpenNotifications() {
@@ -184,6 +224,14 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
     setPersonas(prev => prev.filter(p => p.id !== id));
   }
 
+  const edad = userData?.fecha_nacimiento ? calcEdad(userData.fecha_nacimiento) : null;
+
+  const statsLine = [
+    edad !== null ? `${edad} ${t.years}` : null,
+    userData?.peso ? `${userData.peso} ${t.kg}` : null,
+    userData?.altura ? `${userData.altura} ${t.cm}` : null,
+  ].filter(Boolean).join(" · ");
+
   return (
     <div className="screen">
       <header className="app-header">
@@ -192,13 +240,20 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
         <span />
       </header>
 
+      {/* --- Cambio #6: Cabecera reestructurada --- */}
       <div className="user-card">
         <div className="user-card-top">
-          <div className="user-grid">
-            <span><b>Usuario:</b> {userData?.usuario || "—"}</span>
-            <span><b>Edad:</b> {userData?.fecha_nacimiento ? calcEdad(userData.fecha_nacimiento) + " años" : "—"}</span>
-            <span><b>Peso:</b> {userData?.peso ? userData.peso + " kg" : "—"}</span>
-            <span><b>Altura:</b> {userData?.altura ? userData.altura + " cm" : "—"}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", lineHeight: 1.2 }}>
+              {userData?.usuario || "—"}
+            </div>
+            {statsLine ? (
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3, fontWeight: 600 }}>
+                {statsLine}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 3 }}>—</div>
+            )}
           </div>
           <button className="mailbox-btn" onClick={handleOpenNotifications} title="Notificaciones" style={{ position: "relative" }}>
             <MailboxIcon />
@@ -220,55 +275,90 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
           <div className="card-icon-wrap">
             <img src={getRefereeImage(gl)} alt="resultado" className="referee-img" />
           </div>
-          <button className="share-btn"><ShareIcon /></button>
+          {/* --- Cambio #9: Botón compartir --- */}
+          {hasTest && (
+            <button className="share-btn" onClick={handleShare} title={t.shareDirect}>
+              <ShareIcon />
+            </button>
+          )}
         </div>
 
+        {/* Share options fallback (no Web Share API) */}
+        {showShareOptions && (
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(shareMessage)}`}
+              target="_blank" rel="noopener noreferrer"
+              style={{ background: "#25d366", color: "white", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 700, fontFamily: "Nunito,sans-serif", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              {t.shareViaWhatsApp}
+            </a>
+            <a
+              href="https://www.instagram.com"
+              target="_blank" rel="noopener noreferrer"
+              style={{ background: "#e1306c", color: "white", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 700, fontFamily: "Nunito,sans-serif", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              {t.shareViaInstagram}
+            </a>
+          </div>
+        )}
+
+        {/* --- Cambio #1: Estado negativo --- */}
         {isNegative && (
           <div className="status-negative">
             <div className="car-status-row">
               <CarIcon />
               <div className="status-btn green-status">
-                <div>Apto para conducir</div>
-                <div className="status-sub">Has dado negativo</div>
+                <div>{t.fitToDrive}</div>
+                <div className="status-sub">{t.negativeResult}</div>
               </div>
             </div>
           </div>
         )}
+
+        {/* --- Estado advertencia --- */}
         {isWarning && (
           <div className="status-positive">
             <div className="warning-row">
               <WarningIcon />
-              <span className="positive-text">No apto para conducir</span>
+              <span className="positive-text">{t.notFitToDrive}</span>
             </div>
-            <div className="status-btn red-status" style={{ background: "#ca8a04" }}>NO APTO PARA CONDUCIR</div>
-            <button className="uber-btn"><span className="uber-logo">UBER</span><span>Llamar</span></button>
+            <div className="status-btn red-status" style={{ background: "#ca8a04" }}>{t.notFitToDriveCaps}</div>
+            <button className="uber-btn"><span className="uber-logo">{t.callUberLogo}</span><span>{t.callUberBtn}</span></button>
           </div>
         )}
+
+        {/* --- Cambio #2: Nivel peligroso — AMBOS botones --- */}
         {isDangerous && (
           <div className="status-positive">
             <div className="warning-row">
               <WarningIcon />
-              <span className="positive-text">Nivel peligroso</span>
+              <span className="positive-text">{t.dangerousLevel}</span>
             </div>
-            <div className="status-btn red-status">NIVEL PELIGROSO</div>
-            <button className="sos-btn">📞 <span>Llamar al 112</span></button>
+            <div className="status-btn red-status">{t.dangerousLevelCaps}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button className="sos-btn" style={{ flex: 1 }}>📞 <span>{t.callEmergency}</span></button>
+              <button className="uber-btn" style={{ flex: 1 }}>
+                <span className="uber-logo">{t.callUberLogo}</span><span>{t.callUberBtn}</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
 
       <div className="bottom-section">
         <div className="wait-row">
-          <span className="wait-label">Tiempo de espera</span>
+          <span className="wait-label">{t.waitTime}</span>
           <div className="days-box">
             <span className="days-num">01</span>
-            <span className="days-label">Días sin beber</span>
+            <span className="days-label">{t.soberDays}</span>
           </div>
         </div>
 
         <div className="chart-wrap">
           <ResponsiveContainer width="100%" height={110}>
             <LineChart data={chartData}>
-              <XAxis dataKey="t" tick={{ fontSize: 9, fill: "#aaa" }} label={{ value: "Test nº", position: "insideBottom", offset: -2, fontSize: 9, fill: "#aaa" }} />
+              <XAxis dataKey="t" tick={{ fontSize: 9, fill: "#aaa" }} label={{ value: t.testXAxis, position: "insideBottom", offset: -2, fontSize: 9, fill: "#aaa" }} />
               <YAxis tick={{ fontSize: 9, fill: "#aaa" }} label={{ value: "g/L", angle: -90, position: "insideLeft", fontSize: 9, fill: "#aaa" }} domain={[0, 1.0]} />
               <Tooltip contentStyle={{ fontSize: 10, padding: "2px 6px" }} formatter={(v) => [`${v} g/L`]} />
               <Line type="monotone" dataKey="gl" stroke="#bbb" strokeWidth={2} dot={false} />
@@ -277,23 +367,23 @@ export default function HomeScreen({ onHamburger, onOpenNotifications, currentUs
         </div>
 
         <div className="new-test-row">
-          <button className="new-test-btn" onClick={handleNewTest} title="Simular nuevo test">
+          <button className="new-test-btn" onClick={handleNewTest} title={t.newTest}>
             <BottleIcon />
           </button>
-          <span className="new-test-label">Nuevo test</span>
+          <span className="new-test-label">{t.newTest}</span>
         </div>
       </div>
 
       <div className="personas-section">
-        <div className="personas-title">Personas que quizás conozcas</div>
+        <div className="personas-title">{t.peopleYouMayKnow}</div>
         <div className="personas-scroll">
           {personas.length === 0 && (
             <p style={{ color: "#6b7280", fontSize: 13, padding: "8px 4px", whiteSpace: "nowrap" }}>
-              No hay usuarios disponibles
+              {t.noUsersAvailable}
             </p>
           )}
           {personas.map(p => (
-            <PersonaCard key={p.id} persona={p} currentUser={currentUser} onFollowed={handleFollowed} />
+            <PersonaCard key={p.id} persona={p} currentUser={currentUser} onFollowed={handleFollowed} lang={lang} />
           ))}
         </div>
       </div>
